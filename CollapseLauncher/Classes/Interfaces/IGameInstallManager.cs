@@ -28,7 +28,7 @@ namespace CollapseLauncher.Interfaces
 
         void UpdateCompletenessStatus(CompletenessStatus status);
 
-        bool StartAfterInstall { get; set; }
+        PostInstallBehaviour PostInstallBehaviour { get; set; }
         bool IsUseSophon { get; }
         bool IsSophonInUpdateMode { get; }
     }

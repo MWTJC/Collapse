@@ -4,6 +4,7 @@ using CollapseLauncher.Helper;
 using CollapseLauncher.Helper.Animation;
 using CollapseLauncher.Helper.Metadata;
 using CollapseLauncher.InstallManager.Base;
+using CollapseLauncher.Pages;
 using CommunityToolkit.WinUI;
 using Hi3Helper;
 using Hi3Helper.SentryHelper;
@@ -1461,24 +1462,55 @@ namespace CollapseLauncher.Dialogs
 
         internal static Task<ContentDialogResult> Dialog_DownloadSettings(GamePresetProperty currentGameProperty)
         {
-            ToggleSwitch startAfterInstall = new ToggleSwitch
+            var currentTimeout = GetAppConfigValue("PostInstallShutdownTimeout").ToInt(60);
+            NumberBox shutdownTimeoutBox = new NumberBox()
             {
-                IsOn       = currentGameProperty.GameInstall.StartAfterInstall,
-                OffContent = Lang._Misc.Disabled,
-                OnContent  = Lang._Misc.Enabled
+                Minimum = 0,
+                Maximum = 600,
+                SmallChange = 1,
+                LargeChange = 10,
+                SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Inline,
+                Value   = currentTimeout,
+                Margin  = new Thickness(0d, 8d, 0d, 0d),
             };
-            startAfterInstall.Toggled += (_, _) =>
-                                         {
-                                             currentGameProperty.GameInstall.StartAfterInstall = startAfterInstall.IsOn;
-                                         };
+            
+            shutdownTimeoutBox.ValueChanged += (s, _) =>
+                SetAndSaveConfigValue("PostInstallShutdownTimeout", s.Value);
+
+            StackPanel shutdownPanel = CollapseUIExt.CreateStackPanel();
+            shutdownPanel.AddElementToStackPanel(
+                new TextBlock { Text = "Timeout before shutdown (in seconds)" }.WithMargin(0d, 12d, 0d, 4d),
+                shutdownTimeoutBox
+            );
+            shutdownPanel.SetVisibility(currentGameProperty.GameInstall.PostInstallBehaviour == PostInstallBehaviour.Shutdown
+                ? Visibility.Visible : Visibility.Collapsed);
+            
+            ComboBox postInstallSelector = new ComboBox()
+            {
+                SelectedIndex = (int)currentGameProperty.GameInstall.PostInstallBehaviour,
+                Items =
+                {
+                    new TextBlock { Text = "Do Nothing", TextWrapping = TextWrapping.Wrap },
+                    new TextBlock { Text = "Start Game", TextWrapping = TextWrapping.Wrap },
+                    new TextBlock { Text = "Shutdown Computer", TextWrapping = TextWrapping.Wrap },
+                },
+                Margin = new Thickness(0d, 8d, 0d, 8d)
+            };
+            
+            postInstallSelector.SelectionChanged += (s, _) =>
+            {
+                var    comboBox = s as ComboBox;
+                currentGameProperty.GameInstall.PostInstallBehaviour = (PostInstallBehaviour)(comboBox?.SelectedIndex ?? 0);
+                shutdownPanel.Visibility = currentGameProperty.GameInstall.PostInstallBehaviour == PostInstallBehaviour.Shutdown
+                    ? Visibility.Visible : Visibility.Collapsed;
+            };
 
             StackPanel panel = CollapseUIExt.CreateStackPanel();
             panel.AddElementToStackPanel(
-                                         new TextBlock
-                                                 { Text = Lang._Dialogs.DownloadSettingsOption1 }
-                                            .WithMargin(0d, 0d, 0d, 4d),
-                                         startAfterInstall
-                                        );
+                new TextBlock { Text = "Behaviour after successful install" }.WithMargin(0d, 0d, 0d, 4d),
+                postInstallSelector,
+                shutdownPanel
+                );
 
             return SpawnDialog(Lang._Dialogs.DownloadSettingsTitle,
                                panel,

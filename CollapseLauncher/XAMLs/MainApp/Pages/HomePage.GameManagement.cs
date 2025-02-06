@@ -22,6 +22,7 @@ using System.IO;
 using System.Numerics;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml.Media;
+using System.Diagnostics;
 using static CollapseLauncher.Dialogs.SimpleDialogs;
 using static CollapseLauncher.InnerLauncherConfig;
 using static CollapseLauncher.Helper.Background.BackgroundMediaUtility;
@@ -337,9 +338,7 @@ public sealed partial class HomePage
 
             await CurrentGameProperty.GameInstall.StartPackageInstallation();
             CurrentGameProperty.GameInstall.ApplyGameConfig(true);
-            if (CurrentGameProperty.GameInstall.StartAfterInstall &&
-                CurrentGameProperty.GameVersion.IsGameInstalled())
-                StartGame(null, null);
+            PostInstallProcedure();
 
             // Set the notification trigger to "Completed" state
             CurrentGameProperty.GameInstall.UpdateCompletenessStatus(CompletenessStatus.Completed);
@@ -431,7 +430,7 @@ public sealed partial class HomePage
         finally
         {
             IsSkippingUpdateCheck                             = false;
-            CurrentGameProperty.GameInstall.StartAfterInstall = false;
+            CurrentGameProperty.GameInstall.PostInstallBehaviour = PostInstallBehaviour.Nothing;
 
             CurrentGameProperty.GameInstall.ProgressChanged -= isUseSophon ?
                 GameInstallSophon_ProgressChanged : 
@@ -540,6 +539,28 @@ public sealed partial class HomePage
                 CancelInstallationDownload();
                 break;
         }
+    }
+
+    private void PostInstallProcedure()
+    {
+        if (!CurrentGameProperty.GameVersion.IsGameInstalled()) return;
+        
+        switch (CurrentGameProperty.GameInstall.PostInstallBehaviour)
+        {
+            case PostInstallBehaviour.StartGame:
+                StartGame(null, null);
+                break;
+            case PostInstallBehaviour.Shutdown:
+                var shutdownTimeout = GetAppConfigValue("PostInstallShutdownTimeout").ToInt(60);
+                Process.Start(new ProcessStartInfo("shutdown", $"/s /t {shutdownTimeout}")
+                {
+                    CreateNoWindow  = true,
+                    UseShellExecute = false,
+                });
+                break;
+        }
+
+        CurrentGameProperty.GameInstall.PostInstallBehaviour = PostInstallBehaviour.Nothing;
     }
     #endregion
     
@@ -807,8 +828,7 @@ public sealed partial class HomePage
 
             await CurrentGameProperty.GameInstall.StartPackageInstallation();
             CurrentGameProperty.GameInstall.ApplyGameConfig(true);
-            if (CurrentGameProperty.GameInstall.StartAfterInstall && CurrentGameProperty.GameVersion.IsGameInstalled())
-                StartGame(null, null);
+            PostInstallProcedure();
 
             // Set the notification trigger to "Completed" state
             CurrentGameProperty.GameInstall.UpdateCompletenessStatus(CompletenessStatus.Completed);
@@ -862,7 +882,7 @@ public sealed partial class HomePage
         finally
         {
             IsSkippingUpdateCheck                             = false;
-            CurrentGameProperty.GameInstall.StartAfterInstall = false;
+            CurrentGameProperty.GameInstall.PostInstallBehaviour = PostInstallBehaviour.Nothing;
 
             CurrentGameProperty.GameInstall.ProgressChanged    -= isUseSophon ?
                 GameInstallSophon_ProgressChanged :
